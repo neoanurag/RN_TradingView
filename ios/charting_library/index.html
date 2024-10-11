@@ -1,0 +1,136 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<link rel="stylesheet" href="login-overlay.css">
+		<title>Opo Trade Platform</title>
+
+		<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,minimum-scale=1.0">
+
+		<script type="text/javascript" src="charting_library/charting_library.standalone.js"></script>
+
+		<!-- We'll load these scripts dynamically after we have the token -->
+		<!-- <script type="module" src="src/main.js"></script> -->
+		<!-- <script type="module" src="./dist/bundle.js"></script> -->
+	</head>
+
+	<body style="margin:0px; background-color: rgb(20, 24, 35);">
+		<div id="tv_chart_container"></div>
+
+		<div id="loginOverlayContainer"></div>
+
+    <script>
+        let accessToken = null;
+
+        function checkTokenAndInitialize() {
+            console.log('Checking for token...');
+
+            // Remove any existing token from localStorage
+            localStorage.removeItem("crm_token");
+            localStorage.removeItem("token");
+            console.log('Existing tokens removed from localStorage');
+
+            // Check if we have a token in the query string
+            const urlParams = new URLSearchParams(window.location.search);
+            const queryToken = urlParams.get('crm_token') || urlParams.get('token');
+            
+            if (queryToken) {
+                // If we have a token in the query string, use it and store in localStorage
+                accessToken = queryToken;
+                localStorage.setItem("crm_token", queryToken);
+                console.log('Access token found in query string and stored in localStorage');
+                initializeApp();
+            } else {
+                console.log('No token found, showing login overlay');
+                showLoginOverlay();
+            }
+        }
+
+        function showLoginOverlay() {
+            fetch('login-overlay.html')
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('loginOverlayContainer').innerHTML = html;
+                    
+                    // Add event listener to login form
+                    document.querySelector('#loginOverlay form').addEventListener('submit', handleLogin);
+                });
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            console.log('Login form submitted');
+            const email = document.querySelector('input[type="email"]').value;
+            const password = document.querySelector('input[type="password"]').value;
+            const rememberMe = document.querySelector('input[type="checkbox"]').checked;
+            
+            fetch('https://myaccount.opofinance.com/client-api/login?version=1.0.0', {
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    email: email,
+                    password: password,
+                    rememberMe: rememberMe
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.accessToken) {
+                    accessToken = data.accessToken;
+                    localStorage.setItem("crm_token", accessToken);
+                    document.getElementById('loginOverlay').style.display = 'none';
+                    console.log('Login successful, token stored in localStorage');
+                    // Reload the page with the new token in the URL
+                    window.location.href = window.location.origin + window.location.pathname + '?crm_token=' + accessToken;
+                } else {
+                    console.log('Login failed');
+                    document.getElementById('loginMessage').textContent = 'Login failed. Please try again.';
+                }
+            })
+            .catch(error => {
+                console.error('Error during login:', error);
+                document.getElementById('loginMessage').textContent = 'An error occurred. Please try again.';
+            });
+        }
+
+        function initializeApp() {
+            console.log('Initializing app with token available');
+            
+            // Load main.js
+            const mainScript = document.createElement('script');
+            mainScript.src = 'src/main.js';
+            mainScript.type = 'module';
+            document.body.appendChild(mainScript);
+
+            // Load bundle.js
+            const bundleScript = document.createElement('script');
+            bundleScript.src = './dist/bundle.js';
+            bundleScript.type = 'module';
+            document.body.appendChild(bundleScript);
+
+            // Initialize TradingView chart (if needed)
+            // new TradingView.widget({
+            //     // Your TradingView widget configuration here
+            // });
+
+            // Any other initialization code
+        }
+
+        function getAccessToken() {
+            return accessToken;
+        }
+
+        function logout() {
+            accessToken = null;
+            localStorage.removeItem("crm_token");
+            console.log('Logged out, token removed from localStorage');
+            window.location.href = window.location.origin + window.location.pathname;
+        }
+
+        // Check for token and initialize when the page loads
+        window.addEventListener('load', checkTokenAndInitialize);
+    </script>
+	</body>
+</html>
